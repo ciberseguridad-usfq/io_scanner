@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="es">
+<!-- jsPDF + autoTable para exportar PDF -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>{% block title %}Web Scanner{% endblock %}</title>
+
+  <!-- Bulma, Icons, Fonts -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css" />
+  <script defer src="https://use.fontawesome.com/releases/v5.15.4/js/all.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+
+  <!-- Chart.js para gráficos -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <style>
+    :root {
+      --usfq-primary: #8a1123;
+      --usfq-primary-dark: #6f0e1c;
+      --usfq-ghost: #f9eef0;
+      --bg-soft: #f6f7fb;
+      --text-600: #3c3f44;
+      --text-400: #6b7280;
+      --card-shadow: 0 10px 20px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.05);
+    }
+    html, body { height: 100%; }
+    body {
+      background: var(--bg-soft);
+      color: var(--text-600);
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      display: flex;
+    }
+
+    /* ====== Sidebar ====== */
+    .app-sidebar {
+      width: 260px;
+      min-width: 260px;
+      height: 100vh;
+      position: sticky;
+      top: 0;
+      left: 0;
+      background: #fff;
+      box-shadow: var(--card-shadow);
+      border-right: 1px solid #edf0f5;
+      display: flex;
+      flex-direction: column;
+      padding: 1.25rem 1rem;
+    }
+    .brand-box {
+      text-align: center;
+      margin-bottom: 1rem;
+    }
+    .brand-box img {
+      max-width: 120px;
+      height: auto;
+    }
+    .brand-title {
+      font-weight: 700;
+      margin-top: .5rem;
+      color: var(--usfq-primary);
+    }
+
+    .menu-list a,
+    .menu-list button {
+      display: flex;
+      align-items: center;
+      gap: .6rem;
+      width: 100%;
+      padding: .65rem .75rem;
+      border-radius: 10px;
+      color: #0f1115;
+      text-decoration: none;
+      background: transparent;
+      border: none;
+      cursor: pointer;
+      font: inherit;
+      text-align: left;
+    }
+    .menu-list a:hover,
+    .menu-list button:hover {
+      background: #f1f3f7;
+    }
+    .menu-list a.is-active {
+      background: var(--usfq-ghost);
+      color: var(--usfq-primary);
+      font-weight: 600;
+    }
+
+    /* Submenu */
+    .has-submenu .submenu {
+      margin: .25rem 0 .5rem 2rem;
+      padding-left: .25rem;
+      display: none;
+    }
+    .has-submenu.is-open .submenu {
+      display: block;
+    }
+    .submenu a {
+      font-size: .95rem;
+      padding: .5rem .6rem;
+    }
+
+    /* ====== Main ====== */
+    .app-main {
+      flex: 1;
+      padding: 1.5rem;
+    }
+    .card {
+      border: 1px solid #edf0f5;
+      border-radius: 14px;
+      box-shadow: var(--card-shadow);
+      background: #fff;
+    }
+    .card-header {
+      border-top-left-radius: 14px;
+      border-top-right-radius: 14px;
+    }
+    .tile-card {
+      border: 1px solid #edf0f5;
+      border-radius: 14px;
+      box-shadow: var(--card-shadow);
+      padding: 1.25rem 1.5rem;
+      background: #fff;
+    }
+    .kpi-title {
+      font-size: .8rem;
+      color: #6b7280;
+      margin-top: .25rem;
+    }
+    .kpi-value {
+      font-size: 1.8rem;
+      font-weight: 800;
+    }
+    .chart-wrap {
+      padding: 1rem 1.25rem 1.25rem 1.25rem;
+    }
+    .chart-wrap canvas {
+      width: 100%;
+      height: 260px;
+    }
+
+    .table-container {
+      overflow-x: auto;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- ===== Sidebar ===== -->
+  <aside class="app-sidebar">
+    <div class="brand-box">
+      <figure class="image is-128x128 is-inline-block">
+        <img src="https://mapa-cyber.usfq.edu.ec/static/images/SEGURIDAD.png" alt="Seguridad USFQ">
+      </figure>
+      <div class="brand-title">Web Scanner</div>
+    </div>
+
+    <aside class="menu">
+      <ul class="menu-list">
+        <li><a href="{{ url_for('index') }}" class="{% if active_page == 'index' %}is-active{% endif %}">
+          <span class="icon"><i class="fas fa-home"></i></span>Inicio
+        </a></li>
+        <li><a href="{{ url_for('search') }}" class="{% if active_page == 'search' %}is-active{% endif %}">
+          <span class="icon"><i class="fas fa-search"></i></span>Buscar Resultados
+        </a></li>
+        <li><a href="{{ url_for('history') }}" class="{% if active_page == 'history' %}is-active{% endif %}">
+          <span class="icon"><i class="fas fa-history"></i></span>Historial
+        </a></li>
+
+        <!-- Estadísticas con Submenú -->
+        <li class="has-submenu {% if active_page == 'stats' or selected_tab %}is-open{% endif %}" id="statsMenuItem">
+  <button id="statsToggle">
+    <span class="icon"><i class="fas fa-chart-column"></i></span>
+    Estadísticas
+    <span class="icon" style="margin-left:auto;"><i class="fas fa-angle-down"></i></span>
+  </button>
+  <ul class="submenu" id="statsSub">
+    <li><a href="{{ url_for('stats', tab='dashboard') }}" class="{% if selected_tab == 'dashboard' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-tachometer-alt"></i></span>Dashboard
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='zabbix') }}" class="{% if selected_tab == 'zabbix' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-pulse"></i></span>Zabbix
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='sql') }}" class="{% if selected_tab == 'sql' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-database"></i></span>SQL
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='oracle') }}" class="{% if selected_tab == 'oracle' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-database"></i></span>Oracle
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='http') }}" class="{% if selected_tab == 'http' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-globe"></i></span>HTTP/HTTPS
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='rpcbind') }}" class="{% if selected_tab == 'rpcbind' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-project-diagram"></i></span>rpcbind
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='microsoft-ds') }}" class="{% if selected_tab == 'microsoft-ds' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-project-diagram"></i></span>Microsoft ds
+    </a></li>
+    <li><a href="{{ url_for('stats', tab='RDP') }}" class="{% if selected_tab == 'RDP' %}is-active{% endif %}">
+      <span class="icon"><i class="fas fa-project-diagram"></i></span>RDP
+    </a></li>
+
+    <!-- LDAP con Submenú -->
+   <li class="has-submenu {% if selected_tab in ['LDAP389', 'LDAPS636', 'GC3268', 'GC3269'] %}is-open{% endif %}" id="ldapMenuItem">
+  <button type="button" id="ldapToggle">
+    <span class="icon"><i class="fas fa-chart-column"></i></span>
+    LDAP
+    <span class="icon" style="margin-left:auto;"><i class="fas fa-angle-down"></i></span>
+  </button>
+  <ul class="submenu" id="ldapSub">
+    <li>
+      <a href="{{ url_for('stats', tab='LDAP389') }}" class="{% if selected_tab == 'LDAP389' %}is-active{% endif %}">
+        <span class="icon"><i class="fas fa-lock-open"></i></span>LDAP (389)
+      </a>
+    </li>
+    <li>
+      <a href="{{ url_for('stats', tab='LDAPS636') }}" class="{% if selected_tab == 'LDAPS636' %}is-active{% endif %}">
+        <span class="icon"><i class="fas fa-lock"></i></span>LDAPS (636)
+      </a>
+    </li>
+    <li>
+      <a href="{{ url_for('stats', tab='GC3268') }}" class="{% if selected_tab == 'GC3268' %}is-active{% endif %}">
+        <span class="icon"><i class="fas fa-database"></i></span>GC LDAP (3268)
+      </a>
+    </li>
+    <li>
+      <a href="{{ url_for('stats', tab='GC3269') }}" class="{% if selected_tab == 'GC3269' %}is-active{% endif %}">
+        <span class="icon"><i class="fas fa-database"></i></span>GC LDAPS (3269)
+      </a>
+    </li>
+  </ul>
+</li>
+  </ul>
+</li>
+
+      <!-- Etiquetas -->
+      <div class="mt-3">
+        <span class="tag is-light"><span class="icon"><i class="fas fa-network-wired"></i></span>&nbsp;Port Scan</span>
+        <span class="tag is-light"><span class="icon"><i class="fas fa-lock"></i></span>&nbsp;USFQ</span>
+      </div>
+    </aside>
+  </aside>
+
+  <!-- ===== Contenido Principal ===== -->
+  <main class="app-main">
+    {% block content %}
+      <p>Este es el contenido por defecto. Sobrescribe este bloque en cada página.</p>
+    {% endblock %}
+  </main>
+
+  <!-- Scripts Globales -->
+  <script>
+
+    // Toggle del submenu de estadísticas
+    (function() {
+      const toggle = document.getElementById('statsToggle');
+      const item = document.getElementById('statsMenuItem');
+      if (toggle && item) {
+        toggle.addEventListener('click', () => {
+          item.classList.toggle('is-open');
+        });
+      }
+    })();
+
+    // Filtro genérico para tablas (por IP/Hostname)
+    function setupTableFilter(inputId, tableId) {
+      const input = document.getElementById(inputId);
+      const table = document.getElementById(tableId);
+      if (!input || !table) return;
+
+      const rows = table.querySelectorAll('tbody tr');
+      input.addEventListener('input', function () {
+        const q = this.value.toLowerCase().trim();
+        rows.forEach(tr => {
+          const cells = tr.cells;
+          const ip = (cells[1]?.innerText || '').toLowerCase();
+          const hostname = (cells[2]?.innerText || '').toLowerCase();
+          tr.style.display = (!q || ip.includes(q) || hostname.includes(q)) ? '' : 'none';
+        });
+      });
+    }
+
+    // Inicializar gráficos (si existen)
+    function createLineChart(canvasId, labels, data, label) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: labels,
+          datasets: [{
+            label: label,
+            data: data,
+            borderColor: '#8a1123',
+            backgroundColor: 'rgba(138, 17, 35, 0.1)',
+            tension: 0.3,
+            fill: true
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: {
+            y: { beginAtZero: true, ticks: { precision: 0 } },
+            x: { ticks: { autoSkip: true, maxTicksLimit: 8 } }
+          }
+        }
+      });
+    }
+
+    function createDoughnutChart(canvasId, labels, data) {
+      const ctx = document.getElementById(canvasId);
+      if (!ctx) return;
+      new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: labels,
+          datasets: [{
+            data: data,
+            backgroundColor: ['#8a1123','#c41e3a','#e6c8cc','#f0f3f7','#a0a0a0']
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+  </script>
+
+  <!-- Cargar scripts específicos de cada página -->
+  {% block scripts %}
+  <script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Toggle del menú de estadísticas
+    const statsToggle = document.getElementById('statsToggle');
+    const statsMenuItem = document.getElementById('statsMenuItem');
+    statsToggle?.addEventListener('click', () => {
+      statsMenuItem.classList.toggle('is-open');
+    });
+
+    // Toggle del menú de LDAP
+    const ldapToggle = document.getElementById('ldapToggle');
+    const ldapMenuItem = document.getElementById('ldapMenuItem');
+    ldapToggle?.addEventListener('click', () => {
+      ldapMenuItem.classList.toggle('is-open');
+    });
+  });
+</script>
+
+  {% endblock %}
+
+</body>
+</html>

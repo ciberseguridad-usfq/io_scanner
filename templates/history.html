@@ -1,0 +1,596 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner • Historial de Escaneos{% endblock %}
+
+{% block content %}
+<!-- Hero compacto -->
+<section class="hero is-light mb-4" style="border-radius:16px; box-shadow:var(--card-shadow); padding: 1rem 1.5rem;">
+  <div class="is-flex is-justify-content-space-between is-align-items-center">
+    <div>
+      <h1 class="title is-5 has-text-weight-bold" style="color: var(--usfq-primary); margin: 0;">Historial de Escaneos</h1>
+      <p class="help is-size-7">Explora registros de escaneos pasados.</p>
+    </div>
+  </div>
+</section>
+
+<!-- Filtros + Botones Compactos -->
+<div class="card mb-4">
+  <header class="card-header" style="cursor: pointer;" onclick="toggleFilters()">
+    <p class="card-header-title is-size-7">
+      <span class="icon"><i class="fas fa-filter"></i></span>
+      <span>Filtros avanzados</span>
+    </p>
+    <a class="card-header-icon">
+      <span class="icon"><i class="fas fa-chevron-down" id="filterChevron"></i></span>
+    </a>
+  </header>
+  <div class="card-content" id="filtersContent" style="display: block;">
+    <form method="get" action="{{ url_for('history') }}" class="is-flex is-flex-wrap-wrap is-gap-2 is-align-items-end">
+      <!-- IP -->
+      <div class="field is-flex is-align-items-center">
+        <label class="label is-size-7 mr-2">IP:</label>
+        <div class="control">
+          <input class="input is-small" type="text" name="ip" value="{{ ip or '' }}" placeholder="Ej. 10.78.78.61">
+        </div>
+      </div>
+
+      <!-- Desde -->
+      <div class="field is-flex is-align-items-center">
+        <label class="label is-size-7 mr-2">Desde:</label>
+        <div class="control">
+          <input class="input is-small" type="date" name="from_date" value="{{ from_date or '' }}">
+        </div>
+      </div>
+
+      <!-- Hasta -->
+      <div class="field is-flex is-align-items-center">
+        <label class="label is-size-7 mr-2">Hasta:</label>
+        <div class="control">
+          <input class="input is-small" type="date" name="to_date" value="{{ to_date or '' }}">
+        </div>
+      </div>
+
+      <!-- Hidden inputs -->
+      <input type="hidden" name="per_page" value="{{ per_page }}">
+      <input type="hidden" name="page" value="1">
+
+      <!-- Botones grandes y estilizados -->
+      <!-- Contenedor fijo para botones -->
+<div class="field is-flex is-align-items-center" style="margin-left: auto; gap: 0.5rem; min-width: 320px;">
+  <button class="button is-primary is-medium" type="submit">
+    <span class="icon is-small"><i class="fas fa-search"></i></span>
+    <span>Buscar</span>
+  </button>
+  <a class="button is-light is-medium" href="{{ url_for('history', per_page=per_page) }}">
+    <span class="icon is-small"><i class="fas fa-undo"></i></span>
+    <span>Limpiar</span>
+  </a>
+  <button class="button is-info is-medium" onclick="exportToCSV()">
+    <span class="icon is-small"><i class="fas fa-file-csv"></i></span>
+    <span>CSV</span>
+  </button>
+  <button class="button is-danger is-medium" onclick="exportToPDF()">
+    <span class="icon is-small"><i class="fas fa-file-pdf"></i></span>
+    <span>PDF</span>
+  </button>
+</div>
+    </form>
+  </div>
+</div>
+
+<!-- Tabla estilo "Productos" (inspirada en tu imagen) -->
+<div class="card">
+  <header class="card-header">
+    <p class="card-header-title is-size-7">
+      <span class="icon"><i class="fas fa-list-ul"></i></span>
+      <span>Resultados ({{ total }} registros)</span>
+    </p>
+    <div class="card-header-icon is-flex is-align-items-center">
+      <div class="select is-small">
+        <select name="per_page" onchange="this.form.submit()" form="perPageForm">
+          {% for n in [25,50,100,200,500] %}
+            <option value="{{ n }}" {{ 'selected' if per_page == n else '' }}>{{ n }} / página</option>
+          {% endfor %}
+        </select>
+      </div>
+    </div>
+  </header>
+
+  <form id="perPageForm" method="get" style="display: none;">
+    <input type="hidden" name="page" value="1">
+    <input type="hidden" name="ip" value="{{ ip or '' }}">
+    <input type="hidden" name="from_date" value="{{ from_date or '' }}">
+    <input type="hidden" name="to_date" value="{{ to_date or '' }}">
+  </form>
+
+  {% if scans %}
+  <div class="card-content p-0" style="min-height: 65vh;">
+    <!-- Rango -->
+    {% set first_item = ((page - 1) * per_page) + 1 if total > 0 else 0 %}
+    {% set last_item  = (page * per_page) if (page * per_page) < total else total %}
+<p id="rangeInfo" class="help is-size-7 px-4 pt-3">Mostrando <strong>{{ first_item }}–{{ last_item }}</strong> de <strong>{{ total }}</strong></p>
+    <!-- Tabla estilo "Productos" -->
+    <div class="table-container" style="max-height: 60vh; overflow-y: auto;">
+      <table id="historyTable" class="table is-fullwidth is-hoverable" style="font-size: 0.875rem;">
+        <thead style="background-color: #f9f9f9; border-bottom: 1px solid #e0e6ed;">
+          <tr>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">ID</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">IP</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">Hostname</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">Puerto</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">Estado</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">Servicio</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: left;">Fecha/Hora</th>
+            <th class="has-text-weight-semibold" style="padding: 0.75rem 1rem; text-align: center;">Acciones</th>
+          </tr>
+        </thead>
+       <tbody id="tableBody">
+  {% for scan in scans %}
+  <tr style="transition: all 0.2s ease;">
+    <td class="is-family-monospace">{{ scan[0] }}</td>
+    <td class="is-family-monospace has-text-weight-bold">{{ scan[1] }}</td>
+    <td>{{ scan[2] or '—' }}</td>
+    <td class="has-text-weight-bold">{{ scan[3] }}</td>
+    <td>
+      {% if scan[4] == 'ABIERTO' %}
+        <span class="tag is-success is-light is-small">Abierto</span>
+      {% elif scan[4] == 'CERRADO' %}
+        <span class="tag is-danger is-light is-small">Cerrado</span>
+      {% else %}
+        <span class="tag is-warning is-light is-small">{{ scan[4] }}</span>
+      {% endif %}
+    </td>
+    <td class="has-text-grey">{{ scan[5] or 'Desconocido' }}</td>
+    <td class="has-text-grey">{{ scan[6] }}</td>
+    <td class="has-text-centered">
+      <a href="{{ url_for('search', ip=scan[1], scan_date=(scan[6].split('.')[0] if scan[6] else 'Fecha_Desconocida')) }}"
+         class="button is-small is-rounded is-outlined is-info" title="Ver detalles">
+        <span class="icon is-small"><i class="fas fa-eye"></i></span>
+      </a>
+    </td>
+  </tr>
+  {% endfor %}
+</tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Paginación -->
+  <footer class="card-footer" style="background: #fafbfc;">
+    <div class="card-footer-item">
+      <nav class="pagination is-small is-centered" role="navigation" aria-label="pagination">
+        <a class="pagination-previous {{ 'is-disabled' if page <= 1 }}"
+           href="{{ url_for('history', page=1, per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">Primera</a>
+        <a class="pagination-previous {{ 'is-disabled' if page <= 1 }}"
+           href="{{ url_for('history', page=(page-1 if page>1 else 1), per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">Anterior</a>
+
+        <ul class="pagination-list">
+          {% set window_start = (page - 2) if page > 3 else 1 %}
+          {% set window_end = (page + 2) if page < pages - 2 else pages %}
+
+          {% if window_start > 1 %}
+            <li><a class="pagination-link" href="{{ url_for('history', page=1, per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">1</a></li>
+            {% if window_start > 2 %}<li><span class="pagination-ellipsis">…</span></li>{% endif %}
+          {% endif %}
+
+          {% for p in range(window_start, window_end + 1) %}
+            <li>
+              <a class="pagination-link {{ 'is-current' if p == page }}"
+                 href="{{ url_for('history', page=p, per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">{{ p }}</a>
+            </li>
+          {% endfor %}
+
+          {% if window_end < pages %}
+            {% if window_end < pages - 1 %}<li><span class="pagination-ellipsis">…</span></li>{% endif %}
+            <li><a class="pagination-link" href="{{ url_for('history', page=pages, per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">{{ pages }}</a></li>
+          {% endif %}
+        </ul>
+
+        <a class="pagination-next {{ 'is-disabled' if page >= pages }}"
+           href="{{ url_for('history', page=(page+1 if page<pages else pages), per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">Siguiente</a>
+        <a class="pagination-next {{ 'is-disabled' if page >= pages }}"
+           href="{{ url_for('history', page=pages, per_page=per_page, ip=ip, from_date=from_date, to_date=to_date) }}">Última</a>
+      </nav>
+    </div>
+  </footer>
+
+  {% else %}
+    <div class="card-content has-text-centered py-5">
+      <span class="icon is-large mb-3"><i class="fas fa-inbox fa-2x has-text-grey-light"></i></span>
+      <p class="title is-6 has-text-grey">No hay registros</p>
+      <p class="subtitle is-7">Ajusta los filtros o inicia un nuevo escaneo.</p>
+    </div>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilters() {
+    const content = document.getElementById('filtersContent');
+    const chevron = document.getElementById('filterChevron');
+    if (content.style.display === 'none') {
+      content.style.display = 'block';
+      chevron.classList.remove('fa-chevron-up');
+      chevron.classList.add('fa-chevron-down');
+    } else {
+      content.style.display = 'none';
+      chevron.classList.remove('fa-chevron-down');
+      chevron.classList.add('fa-chevron-up');
+    }
+  }
+
+  function exportToCSV(){
+    const rows = Array.from(document.querySelectorAll("#historyTable tbody tr"));
+    let csv = "ID,IP,Hostname,Puerto,Estado,Servicio,Fecha/Hora\n";
+    rows.forEach(row=>{
+      const cells = Array.from(row.cells).slice(0,7).map(td => `"${td.innerText.replace(/"/g,'""')}"`).join(",");
+      csv += cells + "\n";
+    });
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url; a.download = "historial.csv"; a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  function exportToPDF() {
+    const rows = Array.from(document.querySelectorAll("#historyTable tbody tr"));
+    if (rows.length === 0) {
+        alert("No hay datos para exportar.");
+        return;
+    }
+
+    const headers = Array.from(document.querySelectorAll("#historyTable thead th"))
+        .slice(0, 7)
+        .map(th => th.innerText);
+
+    const data = rows.map(row => {
+        return Array.from(row.cells).slice(0, 7).map(td => {
+            const badge = td.querySelector('.tag');
+            if (badge) {
+                return badge.innerText;
+            }
+            return td.innerText;
+        });
+    });
+
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({
+        orientation: 'landscape',
+        unit: 'mm',
+        format: 'a4'
+    });
+
+    doc.setFontSize(16);
+    doc.setTextColor(138, 17, 35);
+    doc.text("Historial de Escaneos - Web Scanner", 14, 15);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100, 100, 100);
+    doc.text(`Generado el: ${new Date().toLocaleString()}`, 14, 22);
+
+    doc.autoTable({
+        head: [headers],
+        body: data,
+        startY: 30,
+        theme: 'grid',
+        headStyles: {
+            fillColor: [138, 17, 35],
+            textColor: [255, 255, 255],
+            fontSize: 9,
+            fontStyle: 'bold'
+        },
+        bodyStyles: {
+            fontSize: 8,
+            cellPadding: 2
+        },
+        columnStyles: {
+            0: { cellWidth: 15 },
+            1: { cellWidth: 30 },
+            2: { cellWidth: 40 },
+            3: { cellWidth: 20 },
+            4: { cellWidth: 25 },
+            5: { cellWidth: 40 },
+            6: { cellWidth: 40 }
+        },
+        margin: { top: 30, right: 10, bottom: 10, left: 10 },
+        didDrawPage: function (data) {
+            doc.setFontSize(8);
+            doc.setTextColor(150, 150, 150);
+            doc.text(
+                `Página ${doc.getCurrentPageInfo().pageNumber} - Universidad San Francisco de Quito`,
+                data.settings.margin.left,
+                doc.internal.pageSize.height - 10
+            );
+        }
+    });
+
+    doc.save(`historial_escaneos_${new Date().toISOString().slice(0,10)}.pdf`);
+  }
+
+  // Hover suave
+  document.addEventListener('DOMContentLoaded', () => {
+    const rows = document.querySelectorAll('tbody tr');
+    rows.forEach(row => {
+      row.addEventListener('mouseenter', () => {
+        row.style.backgroundColor = '#f8f9fa';
+        row.style.transform = 'translateY(-1px)';
+      });
+      row.addEventListener('mouseleave', () => {
+        row.style.backgroundColor = '';
+        row.style.transform = '';
+      });
+    });
+
+    // Intercepta clics en paginación
+    document.querySelectorAll('#paginationNav a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = this.getAttribute('href');
+        if (!url || url === '#') return;
+
+        // Mostrar loader o atenuar
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="has-text-centered py-4">Cargando...</td></tr>';
+
+        fetch(url, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          // Actualizar rango
+          document.getElementById('rangeInfo').innerHTML = `Mostrando <strong>${data.first_item}–${data.last_item}</strong> de <strong>${data.total}</strong>`;
+
+          // Actualizar tabla
+          const tbody = document.getElementById('tableBody');
+          tbody.innerHTML = '';
+          data.scans.forEach(scan => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover-effect';
+            tr.style = 'transition: all 0.2s ease;';
+            tr.innerHTML = `
+              <td class="is-family-monospace">${scan.id}</td>
+              <td class="is-family-monospace has-text-weight-bold">${scan.ip}</td>
+              <td>${scan.hostname}</td>
+              <td class="has-text-weight-bold">${scan.port}</td>
+              <td>${getBadgeHTML(scan.state)}</td>
+              <td class="has-text-grey">${scan.service}</td>
+              <td class="has-text-grey">${scan.scan_date}</td>
+              <td class="has-text-centered">
+                <a href="/search?ip=${encodeURIComponent(scan.ip)}&scan_date=${encodeURIComponent(scan.scan_date.split('.')[0])}"
+                   class="button is-small is-rounded is-outlined is-info" title="Ver detalles">
+                  <span class="icon is-small"><i class="fas fa-eye"></i></span>
+                </a>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+
+          // Actualizar paginador
+          updatePagination(data.page, data.pages, url);
+
+          // Actualizar URL sin recargar
+          window.history.pushState({}, '', url);
+        })
+        .catch(err => {
+          console.error('Error:', err);
+          alert('Error al cargar la página.');
+        });
+      });
+    });
+  });
+
+  function getBadgeHTML(state) {
+    if (state === 'ABIERTO') {
+      return '<span class="tag is-success is-light is-small">Abierto</span>';
+    } else if (state === 'CERRADO') {
+      return '<span class="tag is-danger is-light is-small">Cerrado</span>';
+    } else {
+      return `<span class="tag is-warning is-light is-small">${state}</span>`;
+    }
+  }
+
+  function updatePagination(currentPage, totalPages, currentUrl) {
+    // Parsear parámetros de la URL actual
+    const url = new URL(currentUrl, window.location.origin);
+    const params = new URLSearchParams(url.search);
+
+    // Generar nuevo paginador
+    let html = '';
+
+    // Botón "Primera"
+    html += `<a class="pagination-previous ${currentPage <= 1 ? 'is-disabled' : ''}" href="${buildUrl(params, 'page', 1)}">Primera</a>`;
+    // Botón "Anterior"
+    html += `<a class="pagination-previous ${currentPage <= 1 ? 'is-disabled' : ''}" href="${buildUrl(params, 'page', Math.max(1, currentPage - 1))}">Anterior</a>`;
+
+    // Ventana de páginas
+    const windowStart = Math.max(1, currentPage - 2);
+    const windowEnd = Math.min(totalPages, currentPage + 2);
+
+    html += '<ul class="pagination-list">';
+
+    if (windowStart > 1) {
+      html += `<li><a class="pagination-link" href="${buildUrl(params, 'page', 1)}">1</a></li>`;
+      if (windowStart > 2) {
+        html += '<li><span class="pagination-ellipsis">…</span></li>';
+      }
+    }
+
+    for (let i = windowStart; i <= windowEnd; i++) {
+      html += `<li><a class="pagination-link ${i === currentPage ? 'is-current' : ''}" href="${buildUrl(params, 'page', i)}">${i}</a></li>`;
+    }
+
+    if (windowEnd < totalPages) {
+      if (windowEnd < totalPages - 1) {
+        html += '<li><span class="pagination-ellipsis">…</span></li>';
+      }
+      html += `<li><a class="pagination-link" href="${buildUrl(params, 'page', totalPages)}">${totalPages}</a></li>`;
+    }
+
+    html += '</ul>';
+
+    // Botón "Siguiente"
+    html += `<a class="pagination-next ${currentPage >= totalPages ? 'is-disabled' : ''}" href="${buildUrl(params, 'page', Math.min(totalPages, currentPage + 1))}">Siguiente</a>`;
+    // Botón "Última"
+    html += `<a class="pagination-next ${currentPage >= totalPages ? 'is-disabled' : ''}" href="${buildUrl(params, 'page', totalPages)}">Última</a>`;
+
+    document.getElementById('paginationNav').innerHTML = html;
+
+    // Reasignar eventos
+    document.querySelectorAll('#paginationNav a').forEach(link => {
+      link.addEventListener('click', function(e) {
+        e.preventDefault();
+        const url = this.getAttribute('href');
+        if (!url || url === '#') return;
+
+        document.getElementById('tableBody').innerHTML = '<tr><td colspan="8" class="has-text-centered py-4">Cargando...</td></tr>';
+
+        fetch(url, {
+          headers: {
+            'X-Requested-With': 'XMLHttpRequest'
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          document.getElementById('rangeInfo').innerHTML = `Mostrando <strong>${data.first_item}–${data.last_item}</strong> de <strong>${data.total}</strong>`;
+          const tbody = document.getElementById('tableBody');
+          tbody.innerHTML = '';
+          data.scans.forEach(scan => {
+            const tr = document.createElement('tr');
+            tr.className = 'hover-effect';
+            tr.style = 'transition: all 0.2s ease;';
+            tr.innerHTML = `
+              <td class="is-family-monospace">${scan.id}</td>
+              <td class="is-family-monospace has-text-weight-bold">${scan.ip}</td>
+              <td>${scan.hostname}</td>
+              <td class="has-text-weight-bold">${scan.port}</td>
+              <td>${getBadgeHTML(scan.state)}</td>
+              <td class="has-text-grey">${scan.service}</td>
+              <td class="has-text-grey">${scan.scan_date}</td>
+              <td class="has-text-centered">
+                <a href="/search?ip=${encodeURIComponent(scan.ip)}&scan_date=${encodeURIComponent(scan.scan_date.split('.')[0])}"
+                   class="button is-small is-rounded is-outlined is-info" title="Ver detalles">
+                  <span class="icon is-small"><i class="fas fa-eye"></i></span>
+                </a>
+              </td>
+            `;
+            tbody.appendChild(tr);
+          });
+          updatePagination(data.page, data.pages, url);
+          window.history.pushState({}, '', url);
+        })
+        .catch(err => {
+          console.error('Error:', err);
+          alert('Error al cargar la página.');
+        });
+      });
+    });
+  }
+
+  function buildUrl(params, key, value) {
+    const newParams = new URLSearchParams(params);
+    newParams.set(key, value);
+    return `${window.location.pathname}?${newParams.toString()}`;
+  }
+</script>
+
+<style>
+  /* Estilo tabla tipo "Productos" */
+  .table thead th {
+    font-weight: 600;
+    color: var(--text-600);
+    background: #f9f9f9;
+    border-bottom: 1px solid #e0e6ed;
+    padding: 0.75rem 1rem;
+    text-transform: none;
+    /* Fijar cabecera */
+    position: sticky;
+    top: 0;
+    z-index: 10;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.05);
+  }
+  .table tbody td {
+    padding: 0.75rem 1rem;
+    border-bottom: 1px solid #f0f0f0;
+  }
+  .table tbody tr:hover {
+    background-color: #f8f9fa !important;
+    cursor: pointer;
+  }
+
+  /* Contenedor de tabla con scroll vertical */
+  .table-container {
+  height: 60vh;           /* ← Altura FIJA */
+  min-height: 300px;      /* ← Mínimo absoluto */
+  overflow-y: auto;
+  background: #fff;
+  border-radius: 12px;
+  border: 1px solid #edf0f5;
+}
+
+  /* Botones grandes y estilizados */
+  .button.is-medium {
+  font-size: 0.9rem;
+  padding: 0.5rem 1rem;
+  height: 2.75rem;            /* ← Altura FIJA */
+  min-width: 90px;            /* ← Ancho mínimo FIJO */
+  border-radius: 6px;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+  transition: all 0.15s ease;
+  display: inline-flex;       /* ← Alineación consistente */
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;                /* ← Espacio ícono-texto consistente */
+}
+  .button.is-medium:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+  }
+
+  /* Filtros más compactos */
+  .card-content form {
+    gap: 0.75rem !important;
+  }
+  .card-content .field {
+    margin-bottom: 0 !important;
+  }
+  .card-content .label {
+    font-weight: 600;
+    color: var(--text-600);
+  }
+
+  /* Acordeón responsive */
+  @media (max-width: 768px) {
+    #filtersContent {
+  display: block;
+  min-height: 80px;           /* ← Altura mínima fija */
+  padding: 1rem !important;   /* ← Padding consistente */
+  background: #fafafa;        /* ← Fondo consistente para evitar "flash" */
+  border-radius: 12px;
+  transition: all 0.2s ease;  /* ← Transición suave */
+}
+    .card-content form {
+      flex-direction: column;
+      align-items: stretch !important;
+    }
+    .card-content form .field {
+      width: 100% !important;
+      justify-content: flex-start !important;
+    }
+    .card-content form .field > label {
+      min-width: auto !important;
+      margin-bottom: 0.25rem;
+    }
+    .card-content form .field > .control {
+      width: 100%;
+    }
+    .card-content form .field:last-child {
+      flex-direction: row;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+    }
+  }
+</style>
+{% endblock %}

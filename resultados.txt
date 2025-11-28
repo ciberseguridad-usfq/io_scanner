@@ -1,0 +1,7 @@
+IP: 172.21.79.3 (retenciones-d-custom-01.usfq.edu.ec)
+  Port 10050: ABIERTO (zabbix-agent)
+  Port 80: open (http)
+  Port 161: closed (snmp)
+  Port 162: closed (snmptrap)
+  Port 443: open (https)
+

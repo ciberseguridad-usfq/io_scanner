@@ -1,0 +1,496 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner • Estadísticas{% endblock %}
+
+{% block content %}
+<section class="hero is-light mb-5" style="border-radius:16px; box-shadow:var(--card-shadow); padding: 1.25rem 1.5rem;">
+  <div class="is-flex is-justify-content-space-between is-align-items-center">
+    <div>
+      <h1 class="title is-4 has-text-weight-bold" style="color: var(--usfq-primary); margin: 0;">Estadísticas</h1>
+      {% if tiles and tiles.get('generated_at') %}
+        <p class="subtitle is-7 has-text-grey">Datos actualizados: <strong>{{ tiles.generated_at }}</strong></p>
+      {% endif %}
+    </div>
+  </div>
+</section>
+
+{% if selected_tab == 'dashboard' %}
+  <!-- KPIs modernos -->
+  <section class="mb-5">
+    <div class="columns is-variable is-4">
+      <div class="column">
+        <div class="card p-4 has-background-white has-text-centered is-shadowless" style="box-shadow: var(--card-shadow); border-radius: 12px; transition: transform 0.2s ease;">
+          <div class="is-flex is-flex-direction-column is-align-items-center" style="gap: 0.5rem;">
+            <i class="fas fa-desktop fa-2x has-text-primary"></i>
+            <p class="has-text-weight-bold is-size-3">{{ total_hosts if total_hosts is not none else 0 }}</p>
+            <p class="has-text-grey is-size-7">Hosts únicos</p>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="card p-4 has-background-white has-text-centered is-shadowless" style="box-shadow: var(--card-shadow); border-radius: 12px; transition: transform 0.2s ease;">
+          <div class="is-flex is-flex-direction-column is-align-items-center" style="gap: 0.5rem;">
+            <i class="fas fa-database fa-2x has-text-primary"></i>
+            <p class="has-text-weight-bold is-size-3">{{ total_registros if total_registros is not none else 0 }}</p>
+            <p class="has-text-grey is-size-7">Entradas totales</p>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="card p-4 has-background-white has-text-centered is-shadowless" style="box-shadow: var(--card-shadow); border-radius: 12px; transition: transform 0.2s ease;">
+          <div class="is-flex is-flex-direction-column is-align-items-center" style="gap: 0.5rem;">
+            <i class="fas fa-lock-open fa-2x has-text-success"></i>
+            <p class="has-text-weight-bold is-size-3">{{ total_abiertos if total_abiertos is not none else 0 }}</p>
+            <p class="has-text-grey is-size-7">Puertos abiertos</p>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="card p-4 has-background-white has-text-centered is-shadowless" style="box-shadow: var(--card-shadow); border-radius: 12px; transition: transform 0.2s ease;">
+          <div class="is-flex is-flex-direction-column is-align-items-center" style="gap: 0.5rem;">
+            <i class="fas fa-lock fa-2x has-text-danger"></i>
+            <p class="has-text-weight-bold is-size-3">{{ total_cerrados if total_cerrados is not none else 0 }}</p>
+            <p class="has-text-grey is-size-7">Puertos cerrados</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Gráficos -->
+  <section class="mb-5">
+    <div class="columns is-variable is-4">
+      <div class="column">
+        <div class="card" style="border-radius: 14px; box-shadow: var(--card-shadow);">
+          <header class="card-header" style="border-top-left-radius: 14px; border-top-right-radius: 14px; background: #f9f9f9;">
+            <p class="card-header-title is-size-7 has-text-weight-semibold">
+              <span class="icon"><i class="fas fa-calendar-day"></i></span>
+              <span>Hosts escaneados por día</span>
+            </p>
+          </header>
+          <div class="card-content p-4">
+            <div class="chart-container" style="height: 280px;">
+              <canvas id="chartPerDay"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="card" style="border-radius: 14px; box-shadow: var(--card-shadow);">
+          <header class="card-header" style="border-top-left-radius: 14px; border-top-right-radius: 14px; background: #f9f9f9;">
+            <p class="card-header-title is-size-7 has-text-weight-semibold">
+              <span class="icon"><i class="fas fa-bullseye"></i></span>
+              <span>Distribución de estados</span>
+            </p>
+          </header>
+          <div class="card-content p-4">
+            <div class="chart-container" style="height: 280px;">
+              <canvas id="chartStateDist"></canvas>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Tablas Top 10 -->
+  <section>
+    <div class="columns is-variable is-4">
+      <div class="column">
+        <div class="card" style="border-radius: 14px; box-shadow: var(--card-shadow);">
+          <header class="card-header" style="border-top-left-radius: 14px; border-top-right-radius: 14px; background: #f9f9f9;">
+            <p class="card-header-title is-size-7 has-text-weight-semibold">
+              <span class="icon"><i class="fas fa-hashtag"></i></span>
+              <span>Top 10 Puertos Abiertos</span>
+            </p>
+          </header>
+          <div class="card-content p-0">
+            <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+              <table class="table is-fullwidth is-striped is-hoverable is-size-7" style="margin: 0;">
+                <thead style="background: #f9f9f9; position: sticky; top: 0; z-index: 1;">
+                  <tr>
+                    <th>#</th>
+                    <th>Puerto</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in top_ports %}
+                  <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="has-text-weight-medium">{{ row[0] }}</td>
+                    <td class="has-text-weight-bold">{{ row[1] }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="column">
+        <div class="card" style="border-radius: 14px; box-shadow: var(--card-shadow);">
+          <header class="card-header" style="border-top-left-radius: 14px; border-top-right-radius: 14px; background: #f9f9f9;">
+            <p class="card-header-title is-size-7 has-text-weight-semibold">
+              <span class="icon"><i class="fas fa-server"></i></span>
+              <span>Top 10 Servicios Abiertos</span>
+            </p>
+          </header>
+          <div class="card-content p-0">
+            <div class="table-container" style="max-height: 320px; overflow-y: auto;">
+              <table class="table is-fullwidth is-striped is-hoverable is-size-7" style="margin: 0;">
+                <thead style="background: #f9f9f9; position: sticky; top: 0; z-index: 1;">
+                  <tr>
+                    <th>#</th>
+                    <th>Servicio</th>
+                    <th>Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {% for row in top_services %}
+                  <tr>
+                    <td>{{ loop.index }}</td>
+                    <td class="has-text-weight-medium">{{ row[0] }}</td>
+                    <td class="has-text-weight-bold">{{ row[1] }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+{% else %}
+  <!-- ======= Vista de SERVICIOS: tabla de hosts ======= -->
+  {% set rows = service_lists.get(selected_tab, []) %}
+  {% set service_title = {
+    'zabbix': 'Zabbix',
+    'sql': 'Bases de Datos (SQL)',
+    'oracle': 'Oracle',
+    'http': 'HTTP/HTTPS',
+    'rpcbind': 'RPCBind',
+    'microsoft-ds': 'MsDS',
+  }[selected_tab] or selected_tab|capitalize %}
+
+  <!-- Hero con ícono y título -->
+  <section class="hero is-light mb-5" style="border-radius:16px; box-shadow:var(--card-shadow); padding: 1.25rem 1.5rem;">
+    <div class="is-flex is-justify-content-space-between is-align-items-center">
+      <div>
+        <h1 class="title is-4 has-text-weight-bold" style="color: var(--usfq-primary); margin: 0;">
+          <span class="icon mr-2">
+            {% if selected_tab == 'zabbix' %}
+              <i class="fas fa-bug"></i>
+            {% elif selected_tab == 'sql' %}
+              <i class="fas fa-database"></i>
+            {% elif selected_tab == 'oracle' %}
+              <i class="fas fa-database" style="color: #ff0000;"></i>
+            {% elif selected_tab == 'http' %}
+              <i class="fas fa-globe"></i>
+            {% elif selected_tab == 'rpcbind' %}
+              <i class="fas fa-project-diagram"></i>
+            {% else %}
+              <i class="fas fa-server"></i>
+            {% endif %}
+          </span>
+          Servidores con servicio: <strong>{{ service_title }}</strong>
+        </h1>
+      </div>
+      <div class="buttons are-small">
+        <button class="button is-info is-light" onclick="exportServiceToCSV('{{ selected_tab }}')">
+          <span class="icon is-small"><i class="fas fa-file-csv"></i></span>
+          <span>Exportar CSV</span>
+        </button>
+      </div>
+    </div>
+  </section>
+
+  <!-- Filtros -->
+  <div class="box mb-4" style="border-radius:14px; box-shadow:var(--card-shadow);">
+    <div class="field has-addons">
+      <p class="control has-icons-left is-expanded">
+        <input class="input" type="text" id="svcFilter" placeholder="Filtrar por IP o hostname..." />
+        <span class="icon is-left"><i class="fas fa-filter"></i></span>
+      </p>
+      <p class="control">
+        <button class="button" id="svcClear" type="button">Limpiar</button>
+      </p>
+    </div>
+  </div>
+
+  <!-- Tabla estilo profesional -->
+  <div class="card">
+    <div class="card-content p-0">
+      {% if rows|length > 0 %}
+        <div class="table-container" style="max-height: 70vh; overflow-y: auto;">
+          <table class="table is-fullwidth is-hoverable is-size-7" id="svcTable" style="margin: 0;">
+            <thead style="background: var(--usfq-ghost); position: sticky; top: 0; z-index: 1; border-bottom: 2px solid #e0e6ed;">
+              <tr>
+                <th class="has-text-weight-semibold">#</th>
+                <th class="has-text-weight-semibold">IP</th>
+                <th class="has-text-weight-semibold">Hostname</th>
+                <th class="has-text-weight-semibold">Último escaneo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for r in rows %}
+                <tr style="border-bottom: 1px solid #f0f0f0; transition: background 0.2s ease;">
+                  <td>{{ loop.index }}</td>
+                  <td class="is-family-monospace has-text-weight-medium">{{ r.ip }}</td>
+                  <td>{{ r.hostname or '—' }}</td>
+                  <td class="has-text-grey">{{ r.last_seen or '—' }}</td>
+                </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+      {% else %}
+        <div class="card-content has-text-centered py-5">
+          <span class="icon is-large mb-3"><i class="fas fa-server fa-2x has-text-grey-light"></i></span>
+          <p class="title is-6 has-text-grey">No se encontraron servidores</p>
+          <p class="subtitle is-7">No hay hosts que coincidan con este servicio o puerto.</p>
+        </div>
+      {% endif %}
+    </div>
+  </div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // === Datos Jinja para perDay y distribución ===
+  const perDay = {{ per_day|tojson|safe }};
+  const distEstado = {{ dist_estado|tojson|safe }};
+
+  const usfqPrimary = '#8a1123';
+
+  // 1) Hosts por día (línea)
+  const ctx1 = document.getElementById('chartPerDay');
+  if (ctx1 && perDay && perDay.length > 0) {
+    new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: perDay.map(x => x[0]),
+        datasets: [{
+          label: 'Hosts/día',
+          data: perDay.map(x => x[1]),
+          borderColor: usfqPrimary,
+          backgroundColor: 'rgba(138, 17, 35, 0.1)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#333',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: usfqPrimary,
+            borderWidth: 1
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { size: 11 } }
+          },
+          x: {
+            ticks: { autoSkip: true, maxTicksLimit: 8, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  // 2) Distribución de estados (doughnut)
+  const ctx4 = document.getElementById('chartStateDist');
+  if (ctx4 && distEstado && Object.keys(distEstado).length > 0) {
+    const labels4 = Object.keys(distEstado);
+    const data4 = Object.values(distEstado);
+    new Chart(ctx4, {
+      type: 'doughnut',
+      data: {
+        labels: labels4,
+        datasets: [{
+          data: data4,
+          backgroundColor: ['#8a1123','#c41e3a','#e6c8cc','#f0f3f7','#a0a0a0'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11 } } },
+          tooltip: {
+            backgroundColor: '#333',
+            titleColor: '#fff',
+            bodyColor: '#fff'
+          }
+        }
+      }
+    });
+  }
+</script>
+
+<script>
+  // Filtro de servicios
+  (function(){
+    const input = document.getElementById('svcFilter');
+    const clear = document.getElementById('svcClear');
+    const rows  = document.querySelectorAll('#svcTable tbody tr');
+    if(!input || !rows.length) return;
+
+    function apply(){
+      const q = (input.value || '').toLowerCase().trim();
+      rows.forEach(tr=>{
+        const ip  = (tr.cells[1]?.innerText || '').toLowerCase();
+        const hn  = (tr.cells[2]?.innerText || '').toLowerCase();
+        tr.style.display = (!q || ip.includes(q) || hn.includes(q)) ? '' : 'none';
+      });
+    }
+
+    input.addEventListener('input', apply);
+    if (clear) {
+      clear.addEventListener('click', ()=>{ input.value=''; apply(); });
+    }
+  })();
+</script>
+<script>
+  // === Datos Jinja para perDay y distribución ===
+  const perDay = {{ per_day|tojson|safe }};
+  const distEstado = {{ dist_estado|tojson|safe }};
+
+  const usfqPrimary = '#8a1123';
+
+  // 1) Hosts por día (línea)
+  const ctx1 = document.getElementById('chartPerDay');
+  if (ctx1 && perDay && perDay.length > 0) {
+    new Chart(ctx1, {
+      type: 'line',
+      data: {
+        labels: perDay.map(x => x[0]),
+        datasets: [{
+          label: 'Hosts/día',
+          data: perDay.map(x => x[1]),
+          borderColor: usfqPrimary,
+          backgroundColor: 'rgba(138, 17, 35, 0.1)',
+          tension: 0.3,
+          fill: true,
+          pointRadius: 4,
+          pointHoverRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { display: false },
+          tooltip: {
+            backgroundColor: '#333',
+            titleColor: '#fff',
+            bodyColor: '#fff',
+            borderColor: usfqPrimary,
+            borderWidth: 1
+          }
+        },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0, font: { size: 11 } }
+          },
+          x: {
+            ticks: { autoSkip: true, maxTicksLimit: 8, font: { size: 11 } }
+          }
+        }
+      }
+    });
+  }
+
+  // 2) Distribución de estados (doughnut)
+  const ctx4 = document.getElementById('chartStateDist');
+  if (ctx4 && distEstado && Object.keys(distEstado).length > 0) {
+    const labels4 = Object.keys(distEstado);
+    const data4 = Object.values(distEstado);
+    new Chart(ctx4, {
+      type: 'doughnut',
+      data: {
+        labels: labels4,
+        datasets: [{
+          data: data4,
+          backgroundColor: ['#8a1123','#c41e3a','#e6c8cc','#f0f3f7','#a0a0a0'],
+          borderWidth: 2,
+          borderColor: '#fff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom', labels: { font: { size: 11 } } },
+          tooltip: {
+            backgroundColor: '#333',
+            titleColor: '#fff',
+            bodyColor: '#fff'
+          }
+        }
+      }
+    });
+  }
+</script>
+
+<script>
+  // Filtro de servicios
+  (function(){
+    const input = document.getElementById('svcFilter');
+    const clear = document.getElementById('svcClear');
+    const rows  = document.querySelectorAll('#svcTable tbody tr');
+    if(!input || !rows.length) return;
+
+    function apply(){
+      const q = (input.value || '').toLowerCase().trim();
+      rows.forEach(tr=>{
+        const ip  = (tr.cells[1]?.innerText || '').toLowerCase();
+        const hn  = (tr.cells[2]?.innerText || '').toLowerCase();
+        tr.style.display = (!q || ip.includes(q) || hn.includes(q)) ? '' : 'none';
+      });
+    }
+
+    input.addEventListener('input', apply);
+    if (clear) {
+      clear.addEventListener('click', ()=>{ input.value=''; apply(); });
+    }
+  })();
+
+  // Exportar CSV por servicio
+  function exportServiceToCSV(service) {
+    const rows = Array.from(document.querySelectorAll("#svcTable tbody tr"));
+    if (rows.length === 0) {
+      alert("No hay datos para exportar.");
+      return;
+    }
+    let csv = "IP,Hostname,Último escaneo\n";
+    rows.forEach(row => {
+      const cells = Array.from(row.cells).slice(1, 4).map(td => `"${td.innerText.replace(/"/g,'""')}"`).join(",");
+      csv += cells + "\n";
+    });
+    const blob = new Blob([csv], {type:"text/csv"});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `servidores_${service}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+</script>
+
+{% endblock %}

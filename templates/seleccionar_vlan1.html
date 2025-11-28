@@ -1,0 +1,359 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner USFQ - Clasificación y Escaneo VLAN{% endblock %}
+
+<!-- Estilos específicos -->
+{% block styles %}
+  <style>
+    /* Hero con fondo especial */
+    .app-hero {
+      background: radial-gradient(1200px 400px at 20% -10%, rgba(138,17,35,.08), transparent),
+                  linear-gradient(135deg, rgba(138,17,35,.06), rgba(255,255,255,0));
+      border-radius: 20px;
+      padding: 1.75rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    /* Título */
+    .title {
+      color: var(--usfq-primary);
+    }
+
+    /* Ayuda sutil */
+    .helper, .help {
+      color: var(--text-400) !important;
+    }
+
+    /* Estilo de código */
+    code {
+      background: #eef1f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    /* Input de archivo */
+    .file-name {
+      font-style: italic;
+      color: #7a7a7a;
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Campo de puerto específico */
+    #puerto-field {
+      display: block;
+    }
+
+    /* Box de consejos */
+    .tips-box {
+      border-radius: 12px;
+      background-color: #f9f9f9;
+    }
+
+    /* Notificación con lista */
+    .notification ul {
+      columns: 2;
+      -webkit-columns: 2;
+      -moz-columns: 2;
+      margin-top: 0.5rem;
+    }
+
+    .notification li {
+      break-inside: avoid;
+      margin-bottom: 0.25rem;
+    }
+
+    /* Footer */
+    .app-footer {
+      margin-top: auto;
+      color: #9aa1aa;
+      padding: 1rem 0;
+    }
+
+    /* Asegurar altura mínima */
+    .app-main {
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .section {
+      flex: 1;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <!-- Hero -->
+  <section class="section pt-5 pb-2">
+    <div class="container">
+      <div class="app-hero">
+        <div class="columns is-vcentered is-variable is-5">
+          <div class="column">
+            <h1 class="title is-4 has-text-weight-bold">🧭 Clasificación por VLAN</h1>
+            <p class="subtitle is-6 helper">
+              Pega IPs o sube un .txt. Luego selecciona una VLAN detectada y elige el modo de escaneo.
+              Conservamos tus nombres de campos y endpoints.
+            </p>
+          </div>
+          <div class="column is-narrow">
+            <div class="box has-text-centered" style="border-radius:14px;">
+              <p class="heading">Estado</p>
+              <p class="title is-5" id="ui-status">Listo</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contenido principal -->
+  <section class="section pt-4">
+    <div class="container">
+      {% if not vlans %}
+        <!-- Paso 1: Ingreso de IPs -->
+        <div class="card mb-5">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="fas fa-layer-group"></i></span>
+              <span class="ml-2">Ingrese direcciones IP</span>
+            </p>
+          </header>
+          <div class="card-content">
+            <form action="{{ url_for('clasificar_ips') }}" method="post" enctype="multipart/form-data" id="form-ips">
+              <div class="columns is-variable is-5">
+                <div class="column">
+                  <div class="field">
+                    <label class="label">IPs (una por línea)</label>
+                    <div class="control">
+                      <textarea class="textarea" name="ips_manual" rows="6" placeholder="172.21.19.2&#10;172.21.21.253"></textarea>
+                    </div>
+                    <p class="help helper">
+                      Acepta IPs o rangos CIDR (ej. <code>172.21.19.0/24</code>).
+                    </p>
+                  </div>
+                </div>
+                <div class="column">
+                  <div class="field">
+                    <label class="label">O cargue archivo <code>.txt</code></label>
+                    <div class="file has-name is-fullwidth">
+                      <label class="file-label">
+                        <input class="file-input" type="file" name="ips_archivo" accept=".txt" />
+                        <span class="file-cta">
+                          <span class="icon"><i class="fas fa-upload"></i></span>
+                          <span>Seleccionar archivo</span>
+                        </span>
+                        <span class="file-name">Ningún archivo seleccionado</span>
+                      </label>
+                    </div>
+                    <p class="help helper">
+                      Una IP por línea o separadas por comas. Entradas inválidas se omiten de forma segura.
+                    </p>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field is-grouped is-grouped-right mt-2">
+                <p class="control">
+                  <button type="reset" class="button">Limpiar</button>
+                </p>
+                <p class="control">
+                  <button type="submit" class="button is-link is-medium">
+                    <span class="icon"><i class="fas fa-check"></i></span>
+                    <span>Clasificar IPs</span>
+                  </button>
+                </p>
+              </div>
+            </form>
+          </div>
+        </div>
+      {% endif %}
+
+      {% if vlans %}
+        <!-- Paso 2: Selección de VLAN y escaneo -->
+        <div class="card">
+          <header class="card-header">
+            <p class="card-header-title">
+              <span class="icon"><i class="fas fa-network-wired"></i></span>
+              <span class="ml-2">Opciones de Escaneo</span>
+            </p>
+          </header>
+          <div class="card-content">
+            <form action="{{ url_for('escanear_vlan') }}" method="post" id="form-scan">
+              <div class="columns is-variable is-5">
+                <div class="column is-6">
+                  <div class="field">
+                    <label class="label">VLAN detectadas</label>
+                    <div class="control">
+                      <div class="select is-fullwidth">
+                        <select name="vlan" id="vlan-select">
+                          {% for vlan, tipo in vlans %}
+                            <option value="{{ vlan }}" data-tipo="{{ tipo }}">VLAN {{ vlan }} ({{ tipo }})</option>
+                          {% endfor %}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+                  <input type="hidden" name="tipo" id="tipo-input" value="{{ vlans[0][1] }}" />
+
+                  <div class="field mt-4">
+                    <label class="label">Modos de Escaneo</label>
+                    <div class="control">
+                      <label class="checkbox mr-4">
+                        <input type="checkbox" name="modo_especifico" id="check-especifico" checked />
+                        <span class="icon"><i class="fas fa-hashtag"></i></span>
+                        <span>Específico</span>
+                      </label>
+                      <label class="checkbox mr-4">
+                        <input type="checkbox" name="modo_basico" id="check-basico" />
+                        <span class="icon"><i class="fas fa-tachometer-alt"></i></span>
+                        <span>Nmap 1-1024</span>
+                      </label>
+                      <label class="checkbox">
+                        <input type="checkbox" name="modo_completo" id="check-completo" />
+                        <span class="icon"><i class="fas fa-broadcast-tower"></i></span>
+                        <span>Nmap completo</span>
+                      </label>
+                    </div>
+                    <p class="help helper">Selecciona uno o varios. El escaneo completo puede tardar más tiempo.</p>
+                  </div>
+
+                  <div class="field" id="puerto-field">
+                    <label class="label">Puerto específico</label>
+                    <div class="field has-addons">
+                      <p class="control is-expanded has-icons-left">
+                        <input class="input" type="number" name="puerto_personalizado" id="puerto-personalizado" value="10050" min="1" max="65535" />
+                        <span class="icon is-left"><i class="fas fa-plug"></i></span>
+                      </p>
+                      <p class="control">
+                        <span class="select">
+                          <select id="port-presets" aria-label="Plantillas de puertos">
+                            <option value="">Presets</option>
+                            <option value="22">SSH (22)</option>
+                            <option value="80">HTTP (80)</option>
+                            <option value="443">HTTPS (443)</option>
+                            <option value="10050">Zabbix Agent (10050)</option>
+                            <option value="3389">RDP (3389)</option>
+                          </select>
+                        </span>
+                      </p>
+                    </div>
+                    <p class="help helper">Selecciona un preset o ingresa el puerto manualmente.</p>
+                  </div>
+                </div>
+
+                <div class="column is-6">
+                  <div class="box tips-box">
+                    <p class="has-text-weight-semibold mb-2">Consejos rápidos</p>
+                    <ul class="content" style="margin-left:1rem;">
+                      <li>Para redes con latencia, considera escaneos básicos primero.</li>
+                      <li>Evita escaneos completos en horarios pico.</li>
+                      <li>Verifica permisos antes de escanear segmentos sensibles.</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <div class="field is-grouped is-grouped-right mt-3">
+                <p class="control">
+                  <button type="submit" class="button is-primary is-medium">
+                    <span class="icon"><i class="fas fa-play"></i></span>
+                    <span>Iniciar Escaneo</span>
+                  </button>
+                </p>
+                <p class="control">
+                  <a href="{{ url_for('clasificar_ips') }}" class="button is-light">
+                    <span class="icon"><i class="fas fa-arrow-left"></i></span>
+                    <span>Volver</span>
+                  </a>
+                </p>
+              </div>
+
+              {% if resultados_clasificacion %}
+                <div class="notification is-info is-light mt-4">
+                  <h2 class="subtitle is-6">📋 IPs clasificadas:</h2>
+                  <ul style="columns: 2; -webkit-columns:2; -moz-columns:2;">
+                    {% for ip, vlan in resultados_clasificacion.items() %}
+                      <li><span class="is-family-monospace">{{ ip }}</span> → VLAN <strong>{{ vlan }}</strong></li>
+                    {% endfor %}
+                  </ul>
+                </div>
+              {% endif %}
+            </form>
+          </div>
+        </div>
+      {% endif %}
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div class="has-text-centered app-footer">
+    <small class="has-text-grey">
+      Universidad San Francisco de Quito • Web Scanner
+    </small>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    // Sincronizar nombre de archivo
+    document.querySelectorAll('.file-input').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const nameSpan = e.target.closest('.file-label').querySelector('.file-name');
+        nameSpan.textContent = e.target.files?.[0]?.name || 'Ningún archivo seleccionado';
+      });
+    });
+
+    // Select VLAN → actualizar input oculto "tipo"
+    const vlanSel = document.getElementById('vlan-select');
+    const tipoInp = document.getElementById('tipo-input');
+    if (vlanSel && tipoInp) {
+      vlanSel.addEventListener('change', function () {
+        tipoInp.value = this.options[this.selectedIndex].dataset.tipo;
+      });
+    }
+
+    // Mostrar/ocultar campo de puerto si "modo específico" está activo
+    const chkEsp = document.getElementById('check-especifico');
+    const puertoField = document.getElementById('puerto-field');
+    function togglePuerto() {
+      puertoField.style.display = chkEsp && chkEsp.checked ? 'block' : 'none';
+    }
+    if (chkEsp && puertoField) {
+      chkEsp.addEventListener('change', togglePuerto);
+      togglePuerto(); // Llamar al inicio
+    }
+
+    // Presets de puertos
+    const presetSel = document.getElementById('port-presets');
+    if (presetSel) {
+      presetSel.addEventListener('change', (e) => {
+        const value = e.target.value;
+        if (value) {
+          const input = document.getElementById('puerto-personalizado');
+          if (input) input.value = value;
+        }
+      });
+    }
+
+    // Validación ligera: al menos una fuente de IPs
+    const formIps = document.getElementById('form-ips');
+    if (formIps) {
+      formIps.addEventListener('submit', (e) => {
+        const txt = formIps.querySelector('[name="ips_manual"]').value.trim();
+        const file = formIps.querySelector('[name="ips_archivo"]').files?.[0];
+        if (!txt && !file) {
+          e.preventDefault();
+          const n = document.createElement('div');
+          n.className = 'notification is-danger is-light';
+          n.innerHTML = '<button class="delete"></button> Debes ingresar IPs manualmente o cargar un archivo .txt.';
+          formIps.insertBefore(n, formIps.firstChild);
+          n.querySelector('.delete').addEventListener('click', () => n.remove());
+        }
+      });
+    }
+  </script>
+{% endblock %}

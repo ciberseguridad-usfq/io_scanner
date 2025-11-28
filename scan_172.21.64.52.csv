@@ -1,0 +1,8 @@
+IP,Hostname,Puerto,Estado,Servicio,Fecha
+172.21.64.52,No resuelto,80,open,http,2025-07-21 14:41:22
+172.21.64.52,No resuelto,80,open,http,2025-07-21 14:41:22
+172.21.64.52,No resuelto,135,open,msrpc,2025-07-21 14:41:22
+172.21.64.52,No resuelto,135,open,msrpc,2025-07-21 14:41:22
+172.21.64.52,No resuelto,445,open,microsoft-ds,2025-07-21 14:41:22
+172.21.64.52,No resuelto,445,open,microsoft-ds,2025-07-21 14:41:22
+172.21.64.52,No resuelto,10050,ABIERTO,zabbix-agent,2025-07-21 14:41:22

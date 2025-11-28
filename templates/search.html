@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner • Buscar Resultados{% endblock %}
+
+<!-- Estilos específicos para esta página -->
+{% block styles %}
+  <style>
+    /* Asegurar que el contenido no se eleve por el sidebar */
+    .app-main {
+      min-height: 100vh;
+    }
+
+    /* Footer fijo al final si hay poco contenido */
+    .section {
+      flex: 1;
+    }
+
+    .app-footer {
+      margin-top: auto;
+      color: #9aa1aa;
+    }
+
+    /* Estilo del título */
+    .title {
+      color: var(--usfq-primary);
+    }
+
+    /* Espaciado del contenedor principal */
+    .container {
+      max-width: 800px;
+    }
+
+    /* Mensaje de error */
+    .notification.is-danger.is-light {
+      border-radius: 12px !important;
+      border-left: 4px solid #ff3860;
+    }
+
+    /* Input con icono */
+    .control.has-icons-left .icon.is-left {
+      color: var(--text-400);
+    }
+
+    /* Ayuda sutil */
+    .help {
+      color: var(--text-400) !important;
+    }
+
+    /* Chips */
+    .chip {
+      display: inline-flex;
+      align-items: center;
+      gap: .4rem;
+      padding: .25rem .6rem;
+      background: #f0f3f7;
+      border-radius: 999px;
+      font-size: .85rem;
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <!-- Hero -->
+  <section class="section pt-5 pb-2">
+    <div class="container">
+      <div class="app-hero">
+        <h1 class="title has-text-centered has-text-weight-bold">Buscar Resultados por IP</h1>
+        <p class="subtitle is-6 has-text-centered">
+          Ingresa una dirección IP para buscar sus resultados de escaneo.
+        </p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Formulario de búsqueda -->
+  <section class="section pt-4">
+    <div class="container">
+      <!-- Mensaje de error -->
+      {% if error %}
+        <div class="notification is-danger is-light">
+          <button class="delete"></button>
+          {{ error }}
+        </div>
+      {% endif %}
+
+      <div class="card">
+        <header class="card-header">
+          <p class="card-header-title">
+            <span class="icon"><i class="fas fa-magnifying-glass"></i></span>
+            <span>Buscar por IP manual o archivo</span>
+          </p>
+        </header>
+        <div class="card-content">
+          <form method="POST" enctype="multipart/form-data">
+            <div class="field">
+              <label class="label">Dirección IP (manual):</label>
+              <div class="control has-icons-left">
+                <input class="input" type="text" name="search_ip" placeholder="Ej: 192.168.1.1" value="{{ request.form.get('search_ip', '') }}">
+                <span class="icon is-left"><i class="fas fa-network-wired"></i></span>
+              </div>
+              <p class="help">Puedes buscar por IP, rango CIDR o nombre de host si está registrado.</p>
+            </div>
+
+            <div class="field is-grouped is-grouped-centered mt-4">
+              <div class="control">
+                <button class="button is-primary is-medium" type="submit">
+                  <span class="icon"><i class="fas fa-search"></i></span>
+                  <span>Buscar</span>
+                </button>
+              </div>
+            </div>
+          </form>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div class="has-text-centered mt-6 app-footer">
+    <small>
+      <span class="icon"><i class="far fa-copyright"></i></span>
+      <span>Universidad San Francisco de Quito • Web Scanner</span>
+    </small>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    // Cerrar notificaciones
+    document.addEventListener('DOMContentLoaded', () => {
+      document.querySelectorAll('.notification .delete').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const notification = btn.closest('.notification');
+          if (notification) notification.remove();
+        });
+      });
+    });
+  </script>
+{% endblock %}

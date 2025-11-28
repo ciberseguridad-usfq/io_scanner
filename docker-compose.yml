@@ -1,0 +1,21 @@
+version: '3.8'
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: "host"  # Para escaneos NMAP
+    ports:
+      - "5000:5000"  # Flask accesible desde fuera
+    volumes:
+      - ./uploads:/app/uploads
+      - ./resultados.csv:/app/resultados.csv
+      - ./resultados.pdf:/app/resultados.pdf
+      - ./scan_results.db:/app/scan_results.db
+    cap_add:
+      - NET_RAW
+      - NET_ADMIN
+    environment:
+      - FLASK_ENV=development
+    restart: unless-stopped

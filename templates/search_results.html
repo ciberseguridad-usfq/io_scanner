@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>Resultados de Búsqueda</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bulma@0.9.3/css/bulma.min.css" />
+  <script defer src="https://use.fontawesome.com/releases/v5.15.4/js/all.js"></script>
+  <style>
+    html, body {
+  height: 100%;
+  margin: 0;
+}
+    body { display: flex; flex-direction: column; }
+    .section { flex: 1; }
+    .app-footer { margin-top: auto !important; }
+
+    :root{
+      --usfq-primary:#8a1123; --usfq-primary-dark:#6f0e1c; --usfq-ghost:#f9eef0;
+      --card-shadow:0 10px 20px rgba(0,0,0,.06), 0 2px 6px rgba(0,0,0,.05);
+      --focus:0 0 0 .2rem rgba(138,17,35,.25);
+    }
+    body{
+      font-family:'Plus Jakarta Sans',sans-serif;
+      background:var(--bg-soft); color:var(--text-600); padding:16px;
+    }
+    .title{ color:var(--usfq-primary); }
+    .button.is-primary{ background-color:var(--usfq-primary); border-color:var(--usfq-primary); }
+    .button.is-primary:hover{ background-color:var(--usfq-primary-dark); border-color:var(--usfq-primary-dark); }
+    .button.is-primary.is-light{ background:var(--usfq-ghost); color:var(--usfq-primary); }
+    .card{ border:1px solid #edf0f5; border-radius:16px; box-shadow:var(--card-shadow); }
+    .card-header{ border-top-left-radius:16px; border-top-right-radius:16px; }
+    .toolbar{ position: sticky; top: .75rem; z-index: 5; }
+    .chart-container img{ max-width:100%; height:auto; border-radius:10px; box-shadow:var(--card-shadow); }
+    .is-clickable{ cursor:pointer; }
+    .input:focus, .textarea:focus, .button:focus{ box-shadow: var(--focus); }
+
+
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <div class="mb-4">
+    <a href="/history" class="button is-light">
+      <span class="icon"><i class="fas fa-arrow-left"></i></span><span>Volver al Historial</span>
+    </a>
+  </div>
+
+  <h1 class="title has-text-centered is-3">Resultados de Búsqueda para IP: {{ ip }}</h1>
+
+  <!-- Acciones globales (solo si hay data) -->
+  {% if scan_date or results %}
+  <div class="box toolbar mb-5">
+    <div class="columns is-vcentered is-variable is-3">
+      <div class="column">
+        {% if scan_date %}
+          <div class="buttons">
+            <a href="/download_ip/{{ ip }}/pdf?scan_date={{ scan_date }}" class="button is-danger">
+              <span class="icon"><i class="fas fa-file-pdf"></i></span><span>PDF (esta IP/fecha)</span>
+            </a>
+            <a href="/download_ip/{{ ip }}/csv?scan_date={{ scan_date }}" class="button is-info">
+              <span class="icon"><i class="fas fa-file-csv"></i></span><span>CSV (esta IP/fecha)</span>
+            </a>
+          </div>
+        {% else %}
+          <div class="buttons">
+            <button class="button is-primary is-light" id="btnExpandAll" type="button">
+              <span class="icon"><i class="fas fa-angle-double-down"></i></span><span>Expandir todo</span>
+            </button>
+            <button class="button is-primary is-light" id="btnCollapseAll" type="button">
+              <span class="icon"><i class="fas fa-angle-double-up"></i></span><span>Colapsar todo</span>
+            </button>
+          </div>
+        {% endif %}
+      </div>
+      <div class="column is-narrow">
+        {% if not scan_date %}
+        <div class="field has-addons">
+          <p class="control is-expanded has-icons-left">
+            <input id="globalPortFilter" class="input" type="text" placeholder="Filtrar por puerto (todas las tablas)">
+            <span class="icon is-left"><i class="fas fa-filter"></i></span>
+          </p>
+          <p class="control">
+            <button type="button" class="button" id="clearGlobalFilter">Limpiar</button>
+          </p>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- Caso 1: UNA fecha (scan_date + ports) -->
+  {% if scan_date and ports %}
+    <section class="card">
+      <header class="card-header">
+        <p class="card-header-title">
+          <span class="icon"><i class="fas fa-calendar-alt"></i></span>
+          <span class="ml-2">Escaneo del: {{ scan_date }} (Hostname: {{ hostname }})</span>
+        </p>
+        <a class="card-header-icon is-clickable toggle-card" title="Mostrar/Ocultar" aria-label="Mostrar/Ocultar" tabindex="0">
+          <span class="icon"><i class="fas fa-angle-down"></i></span>
+        </a>
+      </header>
+      <div class="card-content" style="display:none;">
+        <div class="content">
+          <div class="field is-horizontal mb-3">
+            <div class="field-label is-normal"><label class="label">Filtrar por Puerto:</label></div>
+            <div class="field-body">
+              <div class="field">
+                <div class="control">
+                  <input class="input" type="text" placeholder="Ej. 80" onkeyup="filterPorts(this, '{{ scan_date }}')">
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="table-container">
+            <table class="table is-fullwidth is-striped" data-scan="{{ scan_date }}">
+              <thead>
+              <tr><th>Puerto</th><th>Estado</th><th>Servicio</th></tr>
+              </thead>
+              <tbody>
+              {% for port_data in ports %}
+                <tr>
+                  <td class="is-family-monospace">{{ port_data.port }}</td>
+                  <td>
+                    {% if port_data.state == 'ABIERTO' %}
+                      <span class="tag is-success">{{ port_data.state }}</span>
+                    {% elif port_data.state == 'CERRADO' %}
+                      <span class="tag is-danger">{{ port_data.state }}</span>
+                    {% else %}
+                      <span class="tag is-warning">{{ port_data.state }}</span>
+                    {% endif %}
+                  </td>
+                  <td>{{ port_data.service }}</td>
+                </tr>
+              {% endfor %}
+              </tbody>
+            </table>
+          </div>
+
+          <h4 class="title is-5 mt-5">Gráfico de Puertos:</h4>
+          <div class="chart-container">
+            <!-- SOLO una llamada; pasa los puertos del escaneo actual -->
+            <img loading="lazy"
+                 src="data:image/png;base64,{{ create_bar_chart(ip, ports) }}"
+                 alt="Gráfico de Puertos para {{ ip }}">
+          </div>
+        </div>
+      </div>
+    </section>
+
+  <!-- Caso 2: VARIAS fechas (results agrupados) -->
+  {% else %}
+    {% if not results %}
+      <div class="notification is-warning">No se encontraron resultados.</div>
+    {% else %}
+      {% set grouped_results = {} %}
+      {% for res in results %}
+        {% set scan_date_str = res[5].split('.')[0] if res[5] is not none else 'Fecha no disponible' %}
+        {% if scan_date_str not in grouped_results %}
+          {% set _ = grouped_results.update({scan_date_str: {'hostname': res[1], 'ports': []}}) %}
+        {% endif %}
+        {% set _ = grouped_results[scan_date_str]['ports'].append({'port': res[2], 'state': res[3], 'service': res[4]}) %}
+      {% endfor %}
+
+      {% for sd, data in grouped_results.items() %}
+      <section class="card mb-5">
+        <header class="card-header">
+          <p class="card-header-title">
+            <span class="icon"><i class="fas fa-calendar-alt"></i></span>
+            <span class="ml-2">Escaneo del: {{ sd }} (Hostname: {{ data.hostname }})</span>
+          </p>
+          <a class="card-header-icon is-clickable toggle-card" title="Mostrar/Ocultar" aria-label="Mostrar/Ocultar" tabindex="0">
+            <span class="icon"><i class="fas fa-angle-down"></i></span>
+          </a>
+        </header>
+        <div class="card-content" style="display:none;">
+          <div class="content">
+            <div class="field is-horizontal mb-3">
+              <div class="field-label is-normal"><label class="label">Filtrar por Puerto:</label></div>
+              <div class="field-body">
+                <div class="field">
+                  <div class="control">
+                    <input class="input" type="text" placeholder="Ej. 80" onkeyup="filterPorts(this, '{{ sd }}')">
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="table-container">
+              <table class="table is-fullwidth is-striped" data-scan="{{ sd }}">
+                <thead><tr><th>Puerto</th><th>Estado</th><th>Servicio</th></tr></thead>
+                <tbody>
+                {% for port_data in data.ports %}
+                  <tr>
+                    <td class="is-family-monospace">{{ port_data.port }}</td>
+                    <td>
+                      {% if port_data.state == 'ABIERTO' %}
+                        <span class="tag is-success">{{ port_data.state }}</span>
+                      {% elif port_data.state == 'CERRADO' %}
+                        <span class="tag is-danger">{{ port_data.state }}</span>
+                      {% else %}
+                        <span class="tag is-warning">{{ port_data.state }}</span>
+                      {% endif %}
+                    </td>
+                    <td>{{ port_data.service }}</td>
+                  </tr>
+                {% endfor %}
+                </tbody>
+              </table>
+            </div>
+
+            <h4 class="title is-5 mt-5">Gráfico de Puertos:</h4>
+            <div class="chart-container">
+              <!-- SOLO una llamada; pasa los puertos agrupados de esa fecha -->
+              <img loading="lazy"
+                   src="data:image/png;base64,{{ create_bar_chart(ip, data.ports) }}"
+                   alt="Gráfico de Puertos para {{ ip }}">
+            </div>
+          </div>
+        </div>
+      </section>
+      {% endfor %}
+    {% endif %}
+  {% endif %}
+</div>
+
+<script>
+  // Plegar/Desplegar tarjetas
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.toggle-card').forEach(btn => {
+      const toggle = () => {
+        const card = btn.closest('.card');
+        const content = card.querySelector('.card-content');
+        const icon = btn.querySelector('i');
+        const hidden = content.style.display === 'none';
+        content.style.display = hidden ? 'block' : 'none';
+        icon.classList.toggle('fa-angle-up', hidden);
+        icon.classList.toggle('fa-angle-down', !hidden);
+      };
+      btn.addEventListener('click', (e) => { e.preventDefault(); toggle(); });
+      btn.addEventListener('keypress', (e) => { if(e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); }});
+    });
+
+    // Expandir/Colapsar todo (solo cuando hay múltiples escaneos)
+    const expandAll = document.getElementById('btnExpandAll');
+    const collapseAll = document.getElementById('btnCollapseAll');
+    if (expandAll) {
+      expandAll.addEventListener('click', () => {
+        document.querySelectorAll('.card .card-content').forEach(c => c.style.display = 'block');
+        document.querySelectorAll('.toggle-card i').forEach(i => { i.classList.add('fa-angle-up'); i.classList.remove('fa-angle-down'); });
+      });
+    }
+    if (collapseAll) {
+      collapseAll.addEventListener('click', () => {
+        document.querySelectorAll('.card .card-content').forEach(c => c.style.display = 'none');
+        document.querySelectorAll('.toggle-card i').forEach(i => { i.classList.remove('fa-angle-up'); i.classList.add('fa-angle-down'); });
+      });
+    }
+
+    // Filtro global por puerto (afecta todas las tablas)
+    const globalFilter = document.getElementById('globalPortFilter');
+    const clearGlobal = document.getElementById('clearGlobalFilter');
+    if (globalFilter) {
+      globalFilter.addEventListener('input', () => {
+        const q = globalFilter.value.trim();
+        document.querySelectorAll('table[data-scan]').forEach(table => {
+          table.querySelectorAll('tbody tr').forEach(row => {
+            const port = (row.cells[0]?.innerText || '').trim();
+            row.style.display = port.includes(q) ? '' : 'none';
+          });
+        });
+      });
+    }
+    if (clearGlobal) {
+      clearGlobal.addEventListener('click', () => {
+        if (!globalFilter) return;
+        globalFilter.value = '';
+        globalFilter.dispatchEvent(new Event('input'));
+      });
+    }
+  });
+
+  // Filtro por puerto por tarjeta
+  function filterPorts(input, sectionId){
+    const value = input.value.trim();
+    const table = document.querySelector(`[data-scan="${sectionId}"]`);
+    if (!table) return;
+    table.querySelectorAll('tbody tr').forEach(row => {
+      const port = (row.cells[0]?.innerText || '').trim();
+      row.style.display = port.includes(value) ? '' : 'none';
+    });
+  }
+</script>
+</body>
+</html>

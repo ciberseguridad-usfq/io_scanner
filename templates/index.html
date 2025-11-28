@@ -1,0 +1,315 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner • Escáner de Puertos{% endblock %}
+
+<!-- Estilos específicos para esta página -->
+{% block styles %}
+  <style>
+    /* Hero con fondo especial */
+    .app-hero {
+      background: radial-gradient(1200px 400px at 20% -10%, rgba(138,17,35,.08), transparent),
+                  linear-gradient(135deg, rgba(138,17,35,.06), rgba(255,255,255,0));
+      border-radius: 20px;
+      padding: 2.25rem 2rem;
+      box-shadow: var(--card-shadow);
+    }
+
+    .title.is-3 {
+      color: var(--usfq-primary);
+    }
+
+    /* Formato de ayuda y tips */
+    .help {
+      color: var(--text-400) !important;
+    }
+
+    /* Estilo de los botones de archivo */
+    .file-name {
+      width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    /* Tips box */
+    .tips-box {
+      border-radius: 14px !important;
+      background-color: #f9f9f9;
+    }
+
+    .tips-box code {
+      background: #eef1f5;
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.9em;
+    }
+
+    /* Footer */
+    .app-footer {
+      padding: 1rem;
+      color: #9aa1aa;
+      margin-left: var(--sidebar-w);
+    }
+  </style>
+{% endblock %}
+
+{% block content %}
+  <!-- Hero -->
+  <section class="section pt-5 pb-2">
+    <div class="container">
+      <div class="app-hero">
+        <div class="columns is-vcentered is-variable is-5">
+          <div class="column">
+            <h1 class="title is-3 has-text-weight-bold">Escáner de Puertos</h1>
+            <p class="subtitle is-6">
+              Carga IPs manualmente o mediante archivo, elige el puerto objetivo y activa opciones avanzadas con Nmap.
+              <span class="has-text-grey">Los nombres de campos y endpoints permanecen intactos.</span>
+            </p>
+            <div class="tags">
+              <span class="tag is-primary is-light"><i class="fas fa-info-circle mr-1"></i> Respetamos tus endpoints actuales</span>
+              <span class="tag is-light"><i class="fas fa-clock mr-1"></i> Escaneo rápido + completo</span>
+            </div>
+          </div>
+          <div class="column is-narrow">
+            <div class="box has-text-centered" style="border-radius: 14px;">
+              <p class="heading">Estado</p>
+              <p class="title is-5" id="ui-status">Listo</p>
+              <progress class="progress is-primary is-small" value="0" max="100" id="ui-progress" aria-hidden="true" style="display:none"></progress>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Contenido principal -->
+  <section class="section pt-4">
+    <div class="container">
+      <!-- Mensajes -->
+      {% if error %}
+        <article class="message is-danger">
+          <div class="message-header">
+            <p>Error</p>
+            <button class="delete" aria-label="cerrar"></button>
+          </div>
+          <div class="message-body">{{ error }}</div>
+        </article>
+      {% endif %}
+
+      {% if message %}
+        <article class="message is-info">
+          <div class="message-header">
+            <p>Información</p>
+            <button class="delete" aria-label="cerrar"></button>
+          </div>
+          <div class="message-body">{{ message }}</div>
+        </article>
+      {% endif %}
+
+      <div class="columns is-variable is-6">
+        <!-- Columna izquierda: Escaneo -->
+        <div class="column">
+          <div class="card">
+            <header class="card-header">
+              <p class="card-header-title">
+                <span class="icon"><i class="fas fa-bolt"></i></span>
+                <span>Iniciar Nuevo Escaneo</span>
+              </p>
+            </header>
+            <div class="card-content">
+              <form action="/" method="POST" enctype="multipart/form-data" id="form-scan">
+                <div class="field">
+                  <label class="label">Direcciones IP <span class="has-text-grey">(coma o nueva línea)</span></label>
+                  <div class="control">
+                    <textarea class="textarea" name="ips" placeholder="Ej: 192.168.1.1, 192.168.1.2&#10;10.0.0.1" rows="4"></textarea>
+                  </div>
+                  <p class="help">Puedes pegar múltiples IPs o rangos CIDR. <em>Ejemplo:</em> 172.16.19.0/24</p>
+                </div>
+
+                <div class="field">
+                  <label class="label">O cargar archivo .txt con IPs</label>
+                  <div class="file has-name is-fullwidth">
+                    <label class="file-label">
+                      <input class="file-input" type="file" name="file" accept=".txt" />
+                      <span class="file-cta">
+                        <span class="icon"><i class="fas fa-upload"></i></span>
+                        <span>Seleccionar archivo</span>
+                      </span>
+                      <span class="file-name">Ningún archivo seleccionado</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="columns">
+                  <div class="column is-7">
+                    <div class="field has-addons">
+                      <p class="control has-icons-left is-expanded">
+                        <input class="input" type="number" name="port" value="10050" min="1" max="65535" required />
+                        <span class="icon is-left"><i class="fas fa-plug"></i></span>
+                      </p>
+                      <p class="control">
+                        <span class="select">
+                          <select id="port-presets" aria-label="Plantillas de puertos">
+                            <option value="">Presets</option>
+                            <option value="22">SSH (22)</option>
+                            <option value="80">HTTP (80)</option>
+                            <option value="443">HTTPS (443)</option>
+                            <option value="10050">Zabbix Agent (10050)</option>
+                            <option value="3389">RDP (3389)</option>
+                          </select>
+                        </span>
+                      </p>
+                    </div>
+                    <p class="help">Selecciona un preset o escribe el puerto a analizar.</p>
+                  </div>
+                  <div class="column is-5">
+                    <div class="field">
+                      <div class="control">
+                        <label class="checkbox">
+                          <input type="checkbox" name="run_nmap_scan" /> Escaneo Nmap (1–1024)
+                        </label>
+                      </div>
+                      <div class="control mt-2">
+                        <label class="checkbox">
+                          <input type="checkbox" name="full_nmap_scan" /> Escaneo Nmap completo (1–65535)
+                        </label>
+                        <p class="help">Puede tardar más en rangos grandes.</p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field is-grouped is-grouped-right">
+                  <p class="control">
+                    <button type="reset" class="button">Limpiar</button>
+                  </p>
+                  <p class="control">
+                    <button type="submit" class="button is-primary is-medium">
+                      <span class="icon"><i class="fas fa-play"></i></span>
+                      <span>Iniciar Escaneo</span>
+                    </button>
+                  </p>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+
+        <!-- Columna derecha: Clasificación VLAN -->
+        <div class="column">
+          <div class="card">
+            <header class="card-header">
+              <p class="card-header-title">
+                <span class="icon"><i class="fas fa-layer-group"></i></span>
+                <span>Clasificación por VLAN</span>
+              </p>
+            </header>
+            <div class="card-content">
+              <form method="POST" action="/clasificar_ips" enctype="multipart/form-data" id="form-vlan">
+                <div class="field">
+                  <label class="label">IPs (una por línea)</label>
+                  <div class="control">
+                    <textarea class="textarea" name="ips_manual" rows="6" placeholder="172.16.19.1&#10;172.16.19.2&#10;10.10.12.5"></textarea>
+                  </div>
+                </div>
+
+                <div class="field">
+                  <label class="label">O cargar archivo .txt con IPs</label>
+                  <div class="file has-name is-fullwidth">
+                    <label class="file-label">
+                      <input class="file-input" type="file" name="ips_archivo" accept=".txt" />
+                      <span class="file-cta">
+                        <span class="icon"><i class="fas fa-upload"></i></span>
+                        <span>Seleccionar archivo</span>
+                      </span>
+                      <span class="file-name">Ningún archivo seleccionado</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="field is-grouped is-grouped-right">
+                  <p class="control">
+                    <button type="submit" class="button is-link">
+                      <span class="icon"><i class="fas fa-layer-plus"></i></span>
+                      <span>Clasificar por VLANs</span>
+                    </button>
+                  </p>
+                </div>
+              </form>
+            </div>
+          </div>
+
+          <!-- Tips -->
+          <div class="box mt-4 tips-box">
+            <p class="has-text-weight-semibold mb-2">Consejos rápidos</p>
+            <ul class="content" style="margin-left:1rem;">
+              <li>Usa <code>Ctrl/Cmd + V</code> para pegar IPs desde tu portapapeles.</li>
+              <li>Para grandes volúmenes, prefiere archivo .txt para mejor rendimiento.</li>
+              <li>Activa <em>Escaneo Nmap completo</em> solo si es realmente necesario.</li>
+            </ul>
+          </div>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="has-text-centered mt-6 app-footer">
+        <small>
+          <span class="icon"><i class="far fa-copyright"></i></span>
+          <span>Universidad San Francisco de Quito • Web Scanner</span>
+        </small>
+      </div>
+    </div>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    // Sincronizar nombre de archivo
+    document.querySelectorAll('.file-input').forEach(inp => {
+      inp.addEventListener('change', (e) => {
+        const nameSpan = e.target.closest('.file-label').querySelector('.file-name');
+        nameSpan.textContent = e.target.files?.[0]?.name || 'Ningún archivo seleccionado';
+      });
+    });
+
+    // Presets de puertos
+    const presetSel = document.getElementById('port-presets');
+    if (presetSel) {
+      presetSel.addEventListener('change', (e) => {
+        const value = e.target.value;
+        if (value) {
+          const input = document.querySelector('input[name="port"]');
+          if (input) input.value = value;
+        }
+      });
+    }
+
+    // Mensajes dismiss
+    document.querySelectorAll('.message .delete').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const msg = btn.closest('.message');
+        if (msg) msg.remove();
+      });
+    });
+
+    // Simulación de progreso UI
+    const formScan = document.getElementById('form-scan');
+    if (formScan) {
+      formScan.addEventListener('submit', () => {
+        const status = document.getElementById('ui-status');
+        const prog = document.getElementById('ui-progress');
+        if (status && prog) {
+          status.textContent = 'Escaneando…';
+          prog.style.display = 'block';
+          prog.removeAttribute('aria-hidden');
+          let x = 0;
+          const t = setInterval(() => {
+            x = Math.min(100, x + 7);
+            prog.value = x;
+            if (x >= 100) { clearInterval(t); }
+          }, 300);
+        }
+      });
+    }
+  </script>
+{% endblock %}

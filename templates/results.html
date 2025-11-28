@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+
+{% block title %}Web Scanner • Resultados del Escaneo{% endblock %}
+
+{% block content %}
+<header class="mb-4">
+  <h1 class="title is-3 has-text-weight-bold">Resultados del Escaneo</h1>
+  <p class="subtitle is-6 has-text-grey">Descarga el consolidado o revisa cada host con su tabla y gráfico.</p>
+</header>
+
+<!-- Toolbar global -->
+{% if results %}
+<div class="box toolbar">
+  <div class="columns is-vcentered is-variable is-3">
+    <div class="column is-8">
+      <div class="buttons">
+        <a href="/download/pdf" class="button is-danger" title="Descargar PDF">
+          <span class="icon"><i class="fas fa-file-pdf"></i></span><span>PDF</span>
+        </a>
+        <a href="/download/csv" class="button is-info" title="Descargar CSV">
+          <span class="icon"><i class="fas fa-file-csv"></i></span><span>CSV</span>
+        </a>
+        <button class="button is-primary is-light" id="btnExpandAll" type="button">
+          <span class="icon"><i class="fas fa-angle-double-down"></i></span><span>Expandir todo</span>
+        </button>
+        <button class="button is-primary is-light" id="btnCollapseAll" type="button">
+          <span class="icon"><i class="fas fa-angle-double-up"></i></span><span>Colapsar todo</span>
+        </button>
+      </div>
+    </div>
+    <div class="column is-4">
+      <div class="field has-addons is-pulled-right">
+        <p class="control has-icons-left is-expanded">
+          <input id="ipSearch" class="input" type="text" placeholder="Filtrar por IP o hostname..." />
+          <span class="icon is-left"><i class="fas fa-filter"></i></span>
+        </p>
+        <p class="control">
+          <button class="button" id="clearFilter" type="button">Limpiar</button>
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+{% if results %}
+  {% for entry in results %}
+  <section class="card ip-card" data-ip="{{ entry.ip|lower }}" data-host="{{ (entry.hostname or '')|lower }}">
+    <header class="card-header">
+      <p class="card-header-title">
+        <span class="icon"><i class="fas fa-desktop"></i></span>
+        <span class="ml-2">IP: <strong>{{ entry.ip }}</strong> {% if entry.hostname %}<span class="has-text-grey">({{ entry.hostname }})</span>{% endif %}</span>
+      </p>
+      <div class="card-header-icon is-clickable toggle-card" title="Mostrar/Ocultar" aria-label="Mostrar/Ocultar" tabindex="0">
+        <span class="icon"><i class="fas fa-angle-up" aria-hidden="true"></i></span>
+      </div>
+    </header>
+    <div class="card-content">
+      <div class="content">
+        <div class="columns is-variable is-6">
+          <!-- Tabla de puertos -->
+          <div class="column is-three-fifths">
+            <h4 class="title is-6">Puertos Escaneados</h4>
+            {% if entry.ports %}
+            <div class="table-container">
+              <table class="table is-striped is-hoverable is-fullwidth is-narrow">
+                <thead>
+                  <tr><th>Puerto</th><th>Estado</th><th>Servicio</th></tr>
+                </thead>
+                <tbody>
+                  {% for port in entry.ports %}
+                  <tr>
+                    <td class="is-family-monospace">{{ port.port }}</td>
+                    <td>
+                      <span class="tag {% if port.state=='ABIERTO' %}is-success{% elif port.state=='CERRADO' %}is-danger{% else %}is-warning{% endif %}">{{ port.state }}</span>
+                    </td>
+                    <td>{{ port.service }}</td>
+                  </tr>
+                  {% endfor %}
+                </tbody>
+              </table>
+            </div>
+            {% else %}
+              <p class="has-text-grey">No se encontraron puertos escaneados para esta IP.</p>
+            {% endif %}
+          </div>
+
+          <!-- Gráfico -->
+          <div class="column is-two-fifths">
+            <h4 class="title is-6">Gráfico de Puertos</h4>
+            <div class="chart-container">
+              {% if entry.ports %}
+              <img src="data:image/png;base64,{{ create_bar_chart(entry.ip, entry.ports) }}" alt="Gráfico de Puertos - {{ entry.ip }}" style="max-width:100%; border-radius: 10px; box-shadow: var(--card-shadow);" />
+              {% else %}
+              <p class="has-text-grey">No hay puertos para graficar.</p>
+              {% endif %}
+            </div>
+
+            <!-- Resumen simple (cliente) -->
+            {% if entry.ports %}
+            <div class="mt-2 has-text-grey is-size-7" data-summary>
+              Calculando resumen…
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+  {% endfor %}
+{% else %}
+  <div class="notification is-info is-light has-text-centered">No se encontraron resultados de escaneo.</div>
+{% endif %}
+
+<!-- Footer unificado -->
+<div class="has-text-centered mt-6 app-footer">
+  <small>Universidad San Francisco de Quito • Web Scanner</small>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Expandir/colapsar tarjetas
+  document.addEventListener('DOMContentLoaded', () => {
+    document.querySelectorAll('.toggle-card').forEach(btn => {
+      btn.addEventListener('click', () => toggleCard(btn));
+      btn.addEventListener('keypress', (e) => { if(e.key === 'Enter' || e.key === ' ') toggleCard(btn); });
+    });
+
+    // Botones globales
+    const expandAll = document.getElementById('btnExpandAll');
+    const collapseAll = document.getElementById('btnCollapseAll');
+    if(expandAll){ expandAll.addEventListener('click', ()=> setAllCards(true)); }
+    if(collapseAll){ collapseAll.addEventListener('click', ()=> setAllCards(false)); }
+
+    // Resumen por IP (cliente)
+    document.querySelectorAll('.ip-card').forEach(card=>{
+      const summary = card.querySelector('[data-summary]');
+      if(!summary) return;
+      const rows = card.querySelectorAll('tbody tr');
+      let abiertos=0, cerrados=0, otros=0;
+      rows.forEach(r=>{
+        const estado = (r.cells[1]?.innerText || '').toLowerCase();
+        if(estado.includes('abierto')) abiertos++;
+        else if(estado.includes('cerrado')) cerrados++;
+        else otros++;
+      });
+      summary.textContent = `Puertos: abiertos ${abiertos}, cerrados ${cerrados}${otros?`, otros ${otros}`:''}`;
+    });
+
+    // Filtro global por IP/hostname
+    const ipSearch = document.getElementById('ipSearch');
+    const clearFilter = document.getElementById('clearFilter');
+    if(ipSearch){ ipSearch.addEventListener('input', ()=>{
+      const q = ipSearch.value.trim().toLowerCase();
+      document.querySelectorAll('.ip-card').forEach(card=>{
+        const ip = card.getAttribute('data-ip') || '';
+        const host = card.getAttribute('data-host') || '';
+        card.style.display = (ip.includes(q) || host.includes(q)) ? '' : 'none';
+      });
+    }); }
+    if(clearFilter){ clearFilter.addEventListener('click', ()=>{
+      ipSearch.value=''; ipSearch.dispatchEvent(new Event('input'));
+    }); }
+  });
+
+  function toggleCard(btn){
+    const card = btn.closest('.card');
+    const content = card.querySelector('.card-content');
+    const icon = btn.querySelector('i');
+    const isHidden = content.style.display === 'none';
+    content.style.display = isHidden ? 'block' : 'none';
+    icon.classList.toggle('fa-angle-up', isHidden);
+    icon.classList.toggle('fa-angle-down', !isHidden);
+  }
+
+  function setAllCards(expand){
+    document.querySelectorAll('.ip-card').forEach(card=>{
+      const content = card.querySelector('.card-content');
+      const icon = card.querySelector('.toggle-card i');
+      if(expand){
+        content.style.display='block';
+        icon.classList.add('fa-angle-up'); icon.classList.remove('fa-angle-down');
+      }else{
+        content.style.display='none';
+        icon.classList.remove('fa-angle-up'); icon.classList.add('fa-angle-down');
+      }
+    });
+  }
+</script>
+{% endblock %}

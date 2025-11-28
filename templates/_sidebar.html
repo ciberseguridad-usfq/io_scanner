@@ -1,0 +1,44 @@
+<aside class="sidebar">
+  <div class="box has-text-centered">
+    <figure class="image is-128x128 is-inline-block">
+      <img src="https://mapa-cyber.usfq.edu.ec/static/images/SEGURIDAD.png" alt="Seguridad USFQ">
+    </figure>
+    <p class="title is-5 mt-3">Web Scanner</p>
+  </div>
+
+  <div class="px-3">
+    <a href="{{ url_for('index') }}"   class="is-flex is-align-items-center p-3 my-1 has-text-black {{ 'is-active' if active_page=='index' }}">
+      <span class="ml-3">Inicio</span>
+    </a>
+    <a href="{{ url_for('search') }}"  class="is-flex is-align-items-center p-3 my-1 has-text-black {{ 'is-active' if active_page=='search' }}">
+      <span class="ml-3">Buscar Resultados</span>
+    </a>
+    <a href="{{ url_for('history') }}" class="is-flex is-align-items-center p-3 my-1 has-text-black {{ 'is-active' if active_page=='history' }}">
+      <span class="ml-3">Historial</span>
+    </a>
+
+    <!-- Grupo ESTADÍSTICAS con submenu -->
+    <div class="stats-menu {{ 'is-open' if (active_page or '')[:5] == 'stats' }}">
+      <button type="button" class="stats-toggle is-flex is-align-items-center p-3 my-1 has-text-black">
+        <span class="ml-3">Estadísticas</span>
+        <span class="ml-auto icon"><i class="fas fa-chevron-down"></i></span>
+      </button>
+
+      <ul class="submenu">
+        <li><a href="{{ url_for('stats', tab='dashboard') }}" class="submenu-link {{ 'is-active' if active_page=='stats_dashboard' }}">Dashboard</a></li>
+        <li><a href="{{ url_for('stats', tab='zabbix') }}"    class="submenu-link {{ 'is-active' if active_page=='stats_zabbix' }}">Zabbix</a></li>
+        <li><a href="{{ url_for('stats', tab='sql') }}"       class="submenu-link {{ 'is-active' if active_page=='stats_sql' }}">SQL</a></li>
+        <li><a href="{{ url_for('stats', tab='oracle') }}"    class="submenu-link {{ 'is-active' if active_page=='stats_oracle' }}">Oracle</a></li>
+        <li><a href="{{ url_for('stats', tab='http') }}"      class="submenu-link {{ 'is-active' if active_page=='stats_http' }}">HTTP/HTTPS</a></li>
+        <li><a href="{{ url_for('stats', tab='rpcbind') }}"   class="submenu-link {{ 'is-active' if active_page=='stats_rpcbind' }}">rpcbind</a></li>
+      </ul>
+    </div>
+  </div>
+
+  <div class="px-4 mt-auto pt-5" style="margin-top:2rem;">
+    <div class="is-flex is-flex-wrap-wrap is-gap-2">
+      <span class="chip"><i class="fas fa-network-wired"></i><span>Port Scan</span></span>
+      <span class="chip"><i class="fas fa-lock"></i><span>USFQ</span></span>
+    </div>
+  </div>
+</aside>
