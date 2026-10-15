@@ -1,13 +1,12 @@
-version: '3.8'
-
 services:
-  web:
+  io_scanner:
     build:
       context: .
       dockerfile: Dockerfile
-    network_mode: "host"  # Para escaneos NMAP
-    ports:
-      - "5000:5000"  # Flask accesible desde fuera
+    container_name: io_scanner
+    restart: unless-stopped
+    environment:
+      - FLASK_ENV=development
     volumes:
       - ./uploads:/app/uploads
       - ./resultados.csv:/app/resultados.csv
@@ -16,6 +15,17 @@ services:
     cap_add:
       - NET_RAW
       - NET_ADMIN
-    environment:
-      - FLASK_ENV=development
-    restart: unless-stopped
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.portscanner.rule=Host(`portscanner.usfq.edu.ec`)
+      - traefik.http.routers.portscanner.entrypoints=websecure
+      - traefik.http.routers.portscanner.tls=true
+      - traefik.http.services.portscanner.loadbalancer.server.port=5000
+    networks:
+      - web
+    expose:
+      - "5000"
+
+networks:
+  web:
+    external: true
